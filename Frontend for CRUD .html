@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Course Management System</title>
+<style>
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #e6f0fa;
+    padding: 20px;
+}
+h1 {
+    text-align: center;
+    color: #1e3a8a;
+    margin-bottom: 20px;
+}
+button {
+    border: none;
+    padding: 12px 24px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    margin: 2px;
+    transition: 0.3s;
+}
+button:hover { opacity: 0.9; }
+
+/* Specific button colors */
+#createBtn { background-color: #22c55e; color: white; } /* green */
+#allCoursesBtn { background-color: #3b82f6; color: white; } /* blue */
+td .deleteBtn { background-color: #ef4444; color: white; } /* red */
+td button.updateBtn { background-color: #facc15; color: white; } /* yellow */
+
+/* Table styling */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    margin-top: 20px;
+    font-size: 16px;
+}
+th, td {
+    padding: 14px 16px;
+    border-bottom: 1px solid #d1d5db;
+    text-align: left;
+}
+th {
+    background-color: #60a5fa; 
+    color: white;
+    font-size: 17px;
+}
+tr:hover { background-color: #f1f9ff; }
+
+/* Inactive course style */
+.inactive {
+    background-color: #ffe6e6;
+    color: #b91c1c;
+    font-style: italic;
+}
+
+/* Modal styles */
+.modal {
+    display: none; 
+    position: fixed;
+    z-index: 10;
+    left: 0; top: 0;
+    width: 100%; height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 30px;
+    border-radius: 12px;
+    max-width: 600px;
+    min-width: 400px;
+    position: relative;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
+.close {
+    color: #aaa;
+    position: absolute;
+    top: 10px; right: 15px;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+.close:hover { color: #000; }
+input, textarea { 
+    width: 100%; 
+    padding: 14px;        
+    margin: 10px 0;       
+    border-radius: 10px;   
+    border: 1px solid #ccc; 
+    box-sizing: border-box; 
+    font-size: 16px;      
+}
+textarea { min-height: 150px; }
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+.top-bar input[type=number] {
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    font-size: 16px;
+}
+</style>
+</head>
+<body>
+
+<h1>Course Management System</h1>
+
+<div class="top-bar">
+    <!-- Search box with placeholder -->
+    <input type="number" id="searchBox" placeholder="Search by ID" onkeydown="if(event.key==='Enter') searchById()">
+    <div>
+        <button id="createBtn" onclick="openModal()">Create Course</button>
+        <button id="allCoursesBtn" onclick="fetchCourses()">All Courses</button>
+    </div>
+</div>
+
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Name</th>
+<th>Description</th>
+<th>Created Date</th>
+<th>Updated Date</th>
+<th>Active</th>
+<th>Actions</th>
+</tr>
+</thead>
+<tbody id="courseTableBody"></tbody>
+</table>
+
+<!-- Modal -->
+<div id="courseModal" class="modal">
+<div class="modal-content">
+    <span class="close" onclick="closeModal()">&times;</span>
+    <h2 id="modalTitle">Create / Update Course</h2>
+    <input type="hidden" id="courseId">
+    <input type="text" id="courseName" placeholder="Course Name">
+    <textarea id="courseDescription" placeholder="Course Description"></textarea>
+    <button id="saveBtn" onclick="saveCourse()">Save</button>
+</div>
+</div>
+
+<script>
+const apiBase = "http://localhost:8080";
+
+function openModal(id = null, name = "", description = "") {
+    document.getElementById("courseModal").style.display = "block";
+    document.getElementById("courseId").value = id || "";
+    document.getElementById("courseName").value = name;
+    document.getElementById("courseDescription").value = description;
+    document.getElementById("modalTitle").innerText = id ? "Update Course" : "Create Course";
+}
+
+function closeModal() { document.getElementById("courseModal").style.display = "none"; }
+
+window.onclick = function(event) {
+    const modal = document.getElementById("courseModal");
+    if (event.target == modal) modal.style.display = "none";
+}
+
+async function fetchCourses() {
+    try {
+        const res = await fetch(`${apiBase}/getAllCourses`);
+        const courses = await res.json();
+        populateTable(courses);
+    } catch(e) { console.error(e); alert("Failed to fetch courses."); }
+}
+
+async function searchById() {
+    const id = document.getElementById("searchBox").value;
+    if(!id) { alert("Enter Course ID"); return; }
+    try {
+        const res = await fetch(`${apiBase}/getCourseById?id=${id}`);
+        const course = await res.json();
+        if(course.id) populateTable([course]);
+        else alert("Course not found");
+    } catch(e) { console.error(e); alert("Failed to fetch course by ID."); }
+}
+
+function populateTable(courses) {
+    const tbody = document.getElementById("courseTableBody");
+    tbody.innerHTML = "";
+    courses.forEach(course => {
+        const tr = document.createElement("tr");
+        if(!course.isActive) tr.classList.add("inactive");
+        tr.innerHTML = `
+            <td>${course.id}</td>
+            <td>${course.name}</td>
+            <td>${course.description}</td>
+            <td>${course.createdDate}</td>
+            <td>${course.updatedDate || "-"}</td>
+            <td>${course.isActive}</td>
+            <td>
+                <button class="updateBtn" onclick="openModal(${course.id}, '${escapeString(course.name)}', '${escapeString(course.description)}')">Update</button>
+                <button class="deleteBtn" onclick="deleteCourse(${course.id})">Delete</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function escapeString(str) { return str.replace(/'/g, "\\'"); }
+
+async function saveCourse() {
+    const id = document.getElementById("courseId").value;
+    const name = document.getElementById("courseName").value.trim();
+    const description = document.getElementById("courseDescription").value.trim();
+    if(!name) { alert("Name required"); return; }
+
+    const course = id ? { id: parseInt(id), name, description } : { name, description };
+
+    try {
+        const res = await fetch(`${apiBase}/createCourse`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(course)
+        });
+        alert(await res.text());
+        closeModal();
+        fetchCourses();
+    } catch(e) { console.error(e); alert("Failed to save/update course."); }
+}
+
+async function deleteCourse(id) {
+    if(!confirm("Are you sure to delete?")) return;
+    try {
+        const res = await fetch(`${apiBase}/deleteCourse/${id}`, { method: "DELETE" });
+        alert(await res.text());
+        fetchCourses();
+    } catch(e) { console.error(e); alert("Failed to delete course."); }
+}
+
+// Auto-load all courses on page load
+fetchCourses();
+</script>
+
+</body>
+</html>
